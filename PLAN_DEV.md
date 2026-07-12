@@ -12,12 +12,12 @@ Ce plan découle de `CLAUDE.md`. Ordre d'exécution strict : DB → Edge Functio
 
 ## Étape 1 — Base de données (Supabase)
 
-- [ ] Créer les tables Phase 1 : `companies`, `users`, `clients`, `chantiers`, `devis`, `devis_lines`, `relances_log`, `avis_clients` (schéma exact dans `CLAUDE.md` section 3)
-- [ ] Créer les tables Phase 2 vides (`factures`, `contrats_entretien`) — structure seulement, pas de logique dessus
-- [ ] Activer RLS sur toutes les tables
-- [ ] Policy RLS de base : un `user` ne voit que les lignes où `company_id = auth.jwt() -> company_id` (à affiner selon le système d'auth choisi)
-- [ ] Créer le bucket Supabase Storage `devis-audio` (privé, accès via signed URL)
-- [ ] **Test de validation** : insérer une ligne test dans `devis` via l'éditeur SQL Supabase, vérifier qu'elle apparaît dans Table Editor. Supprimer après test.
+- [x] Créer les tables Phase 1 : `companies`, `users`, `clients`, `chantiers`, `devis`, `devis_lines`, `relances_log`, `avis_clients` (schéma exact dans `CLAUDE.md` section 3)
+- [x] Créer les tables Phase 2 vides (`factures`, `contrats_entretien`) — structure seulement, pas de logique dessus
+- [x] Activer RLS sur toutes les tables
+- [x] Policy RLS de base : un `user` ne voit que les lignes où `company_id = current_company_id()` (fonction `private.current_company_id()`, à affiner selon le système d'auth choisi)
+- [x] Créer le bucket Supabase Storage `devis-audio` (privé, accès via signed URL)
+- [x] **Test de validation** : insérer une ligne test dans `devis` via l'éditeur SQL Supabase, vérifier qu'elle apparaît dans Table Editor. Supprimer après test.
 
 ## Étape 2 — Supabase Edge Function (génération devis vocal)
 
