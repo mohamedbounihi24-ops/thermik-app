@@ -21,16 +21,17 @@ Ce plan découle de `CLAUDE.md`. Ordre d'exécution strict : DB → Edge Functio
 
 ## Étape 2 — Supabase Edge Function (génération devis vocal)
 
-- [ ] Créer la fonction `generate-devis` (`supabase functions new generate-devis`)
-- [ ] Stocker `OPENAI_API_KEY` en secret Supabase (`supabase secrets set`), jamais dans le code
-- [ ] Logique de la fonction :
-  1. Reçoit `{ audio_url, client_id, company_id }`
-  2. Télécharge l'audio depuis Storage
-  3. Appelle Whisper (transcription)
-  4. Appelle GPT-4o avec un prompt structuré pour extraire les lignes de devis (JSON strict : description, quantité, unité, prix unitaire)
-  5. Insert dans `devis` (statut `brouillon`) + `devis_lines`
-  6. Retourne `{ devis_id }` en réponse
-- [ ] **Test de validation** : appeler la fonction avec `curl` et un fichier audio test, vérifier que le devis + les lignes apparaissent bien en base avant de toucher au frontend
+- [x] Créer la fonction `generate-devis` (`supabase functions new generate-devis`)
+- [x] Stocker `OPENAI_API_KEY` en secret Supabase (`supabase secrets set`), jamais dans le code
+- [x] Logique de la fonction (voir `docs/superpowers/specs/2026-07-13-generate-devis-design.md` pour le détail des décisions) :
+  1. Reçoit `{ audio_path, client_id }` — `company_id` est dérivé du JWT de l'utilisateur appelant (jamais du payload, pour éviter de faire confiance au front)
+  2. Vérifie que `client_id` appartient bien à cette company (RLS)
+  3. Télécharge l'audio depuis Storage (`audio_path` = chemin dans le bucket privé `devis-audio`)
+  4. Appelle Whisper (transcription)
+  5. Appelle GPT-4o (Structured Outputs, schéma strict) pour extraire les lignes de devis (description, quantité, unité, prix unitaire, montant_ligne)
+  6. Insert atomique (RPC `create_devis_with_lines`) dans `devis` (statut `brouillon`, `numero` séquentiel auto-généré) + `devis_lines`
+  7. Retourne `{ devis_id, numero }` en réponse
+- [x] **Test de validation** : appelé la fonction avec `curl` (user/company/client de test créés via l'API Admin, fichier audio de test synthétisé) ; devis + lignes apparaissent bien en base. Cas d'erreur vérifiés : 403 (client hors company), 400 (audio introuvable), 401 (JWT absent). Données de test nettoyées après coup.
 
 ## Étape 3 — Frontend React
 
