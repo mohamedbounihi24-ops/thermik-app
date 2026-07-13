@@ -35,14 +35,14 @@ Ce plan découle de `CLAUDE.md`. Ordre d'exécution strict : DB → Edge Functio
 
 ## Étape 3 — Frontend React
 
-- [ ] Setup client Supabase (`@supabase/supabase-js`), variables d'env `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
-- [ ] Page **Dashboard** : `useEffect` avec fetch réel `supabase.from('devis').select()` au montage — vérifier explicitement que les données persistent après changement d'onglet (c'était le bug v1)
-- [ ] Subscription Realtime sur `devis` pour mise à jour live sans reload
+- [x] Setup client Supabase (`@supabase/supabase-js`), variables d'env `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (voir `docs/superpowers/specs/2026-07-14-frontend-dashboard-design.md` : Vite, Tailwind v4, react-router avec les 5 routes déclarées, auth minimale)
+- [x] Page **Dashboard** : `useEffect` avec fetch réel `supabase.from('devis').select('id, numero, statut, montant_ht, created_at, clients(name)')` au montage — **testé manuellement par l'utilisateur** : login, F5, changement d'onglet après création d'un devis côté serveur, déconnexion/route protégée — tout fonctionne. Le bug v1 est corrigé.
+- [x] Subscription Realtime sur `devis` (`postgres_changes`, `event: '*'`) pour mise à jour live sans reload — nécessite `supabase/migrations/0005_enable_realtime_devis.sql`, confirmée fonctionnelle par le test manuel ci-dessus
 - [ ] Page **Nouveau devis** : enregistrement audio → upload direct vers Supabase Storage → appel de l'Edge Function `generate-devis` → affichage du résultat
 - [ ] Page **Détail devis** : édition des lignes, changement de statut (`brouillon` → `envoyé` → `accepté`/`refusé`)
 - [ ] Page **Clients** : CRUD simple
 - [ ] Page **Suivi relances** : lecture de `relances_log` filtrée par devis
-- [ ] **Test de validation** : créer un devis, changer d'onglet, revenir — le devis doit toujours être là. C'est LE test qui valide que le bug v1 est corrigé.
+- [x] **Test de validation** : créer un devis, changer d'onglet, revenir — le devis doit toujours être là. C'est LE test qui valide que le bug v1 est corrigé. **Validé manuellement par l'utilisateur.**
 
 ## Étape 4 — Workflows n8n (asynchrone uniquement)
 
