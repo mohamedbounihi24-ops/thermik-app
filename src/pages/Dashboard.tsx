@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
-
-type Statut = 'brouillon' | 'envoyé' | 'accepté' | 'refusé' | 'expiré'
+import { STATUT_STYLES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
 
 type DevisRow = {
   id: string
@@ -13,17 +13,6 @@ type DevisRow = {
 }
 
 const DEVIS_SELECT = 'id, numero, statut, montant_ht, created_at, clients(name)'
-
-const STATUT_STYLES: Record<Statut, string> = {
-  brouillon: 'bg-gray-100 text-gray-700',
-  'envoyé': 'bg-blue-100 text-blue-700',
-  'accepté': 'bg-green-100 text-green-700',
-  'refusé': 'bg-red-100 text-red-700',
-  'expiré': 'bg-amber-100 text-amber-700',
-}
-
-const currencyFormatter = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
-const dateFormatter = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' })
 
 export default function Dashboard() {
   const [devisList, setDevisList] = useState<DevisRow[]>([])
@@ -116,20 +105,22 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {devisList.map((devis) => (
-              <tr key={devis.id} className="border-b border-gray-100">
-                <td className="py-2 pr-4 font-medium text-gray-900">{devis.numero}</td>
-                <td className="py-2 pr-4 text-gray-700">{devis.clients?.name ?? '—'}</td>
-                <td className="py-2 pr-4">
-                  <span
-                    className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${STATUT_STYLES[devis.statut]}`}
-                  >
-                    {devis.statut}
-                  </span>
-                </td>
-                <td className="py-2 pr-4 text-gray-700">
-                  {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
-                </td>
-                <td className="py-2 pr-4 text-gray-500">{dateFormatter.format(new Date(devis.created_at))}</td>
+              <tr key={devis.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <Link to={`/devis/${devis.id}`} className="contents">
+                  <td className="py-2 pr-4 font-medium text-gray-900">{devis.numero}</td>
+                  <td className="py-2 pr-4 text-gray-700">{devis.clients?.name ?? '—'}</td>
+                  <td className="py-2 pr-4">
+                    <span
+                      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${STATUT_STYLES[devis.statut]}`}
+                    >
+                      {devis.statut}
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 text-gray-700">
+                    {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
+                  </td>
+                  <td className="py-2 pr-4 text-gray-500">{dateFormatter.format(new Date(devis.created_at))}</td>
+                </Link>
               </tr>
             ))}
           </tbody>
