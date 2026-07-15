@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
-import { STATUT_STYLES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
+import { STATUT_TONES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
+import { Alert, PageHeader, StatusBadge, TABLE_WRAP, TD_CLASS, TH_CLASS, TR_CLASS } from '../components/ui'
 
 type DevisRow = {
   id: string
@@ -80,51 +81,49 @@ export default function Dashboard() {
   }, [])
 
   if (loading) {
-    return <p className="text-gray-500">Chargement des devis…</p>
+    return <p className="text-sm text-slate-500">Chargement des devis…</p>
   }
 
   if (error) {
-    return <p className="rounded bg-red-50 p-4 text-red-700">{error}</p>
+    return <Alert>{error}</Alert>
   }
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold text-gray-900">Devis</h1>
+      <PageHeader title="Devis" />
       {devisList.length === 0 ? (
-        <p className="text-gray-500">Aucun devis pour le moment.</p>
+        <p className="text-sm text-slate-500">Aucun devis pour le moment.</p>
       ) : (
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2 pr-4">Numéro</th>
-              <th className="py-2 pr-4">Client</th>
-              <th className="py-2 pr-4">Statut</th>
-              <th className="py-2 pr-4">Montant HT</th>
-              <th className="py-2 pr-4">Date de création</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devisList.map((devis) => (
-              <tr key={devis.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <Link to={`/devis/${devis.id}`} className="contents">
-                  <td className="py-2 pr-4 font-medium text-gray-900">{devis.numero}</td>
-                  <td className="py-2 pr-4 text-gray-700">{devis.clients?.name ?? '—'}</td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${STATUT_STYLES[devis.statut]}`}
-                    >
-                      {devis.statut}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4 text-gray-700">
-                    {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
-                  </td>
-                  <td className="py-2 pr-4 text-gray-500">{dateFormatter.format(new Date(devis.created_at))}</td>
-                </Link>
+        <div className={TABLE_WRAP}>
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                <th className={TH_CLASS}>Numéro</th>
+                <th className={TH_CLASS}>Client</th>
+                <th className={TH_CLASS}>Statut</th>
+                <th className={TH_CLASS}>Montant HT</th>
+                <th className={TH_CLASS}>Date de création</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {devisList.map((devis) => (
+                <tr key={devis.id} className={TR_CLASS}>
+                  <Link to={`/devis/${devis.id}`} className="contents">
+                    <td className={`${TD_CLASS} font-medium text-slate-900`}>{devis.numero}</td>
+                    <td className={`${TD_CLASS} text-slate-700`}>{devis.clients?.name ?? '—'}</td>
+                    <td className={TD_CLASS}>
+                      <StatusBadge tone={STATUT_TONES[devis.statut]} label={devis.statut} />
+                    </td>
+                    <td className={`${TD_CLASS} font-mono tabular-nums text-slate-700`}>
+                      {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
+                    </td>
+                    <td className={`${TD_CLASS} text-slate-500`}>{dateFormatter.format(new Date(devis.created_at))}</td>
+                  </Link>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

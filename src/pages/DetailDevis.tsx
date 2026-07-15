@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { supabase } from '../lib/supabase'
-import { STATUT_STYLES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
+import { STATUT_TONES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
+import { Alert, Button, StatusBadge, TableInput, TD_CLASS, TH_CLASS } from '../components/ui'
 
 type Devis = {
   id: string
@@ -186,64 +187,61 @@ export default function DetailDevis() {
     setStatusUpdating(false)
   }
 
-  if (loading) return <p className="text-gray-500">Chargement du devis…</p>
-  if (loadError) return <p className="rounded bg-red-50 p-4 text-red-700">{loadError}</p>
+  if (loading) return <p className="text-sm text-slate-500">Chargement du devis…</p>
+  if (loadError) return <Alert>{loadError}</Alert>
   if (!devis) return null
 
   return (
     <div>
-      <Link to="/dashboard" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+      <Link to="/dashboard" className="mb-4 inline-block text-sm font-medium text-copper-600 hover:underline">
         ← Retour aux devis
       </Link>
 
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{devis.numero}</h1>
-          <p className="text-gray-700">{devis.clients?.name ?? '—'}</p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-slate-900">{devis.numero}</h1>
+          <p className="text-slate-600">{devis.clients?.name ?? '—'}</p>
         </div>
-        <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${STATUT_STYLES[devis.statut]}`}>
-          {devis.statut}
-        </span>
+        <StatusBadge tone={STATUT_TONES[devis.statut]} label={devis.statut} />
       </div>
 
-      <dl className="mb-6 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+      <dl className="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-6 text-sm sm:grid-cols-4">
         <div>
-          <dt className="text-gray-500">Montant HT</dt>
-          <dd className="text-gray-900">
+          <dt className="text-slate-500">Montant HT</dt>
+          <dd className="font-mono tabular-nums text-slate-900">
             {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">Créé le</dt>
-          <dd className="text-gray-900">{dateFormatter.format(new Date(devis.created_at))}</dd>
+          <dt className="text-slate-500">Créé le</dt>
+          <dd className="text-slate-900">{dateFormatter.format(new Date(devis.created_at))}</dd>
         </div>
         <div>
-          <dt className="text-gray-500">Envoyé le</dt>
-          <dd className="text-gray-900">
+          <dt className="text-slate-500">Envoyé le</dt>
+          <dd className="text-slate-900">
             {devis.date_envoi ? dateFormatter.format(new Date(devis.date_envoi)) : '—'}
           </dd>
         </div>
         <div>
-          <dt className="text-gray-500">Répondu le</dt>
-          <dd className="text-gray-900">
+          <dt className="text-slate-500">Répondu le</dt>
+          <dd className="text-slate-900">
             {devis.date_reponse ? dateFormatter.format(new Date(devis.date_reponse)) : '—'}
           </dd>
         </div>
       </dl>
 
-      {statusError && <p className="mb-4 rounded bg-red-50 p-4 text-red-700">{statusError}</p>}
+      {statusError && <Alert className="mb-4">{statusError}</Alert>}
 
       <div className="mb-6 flex items-center gap-2">
         {devis.statut === 'brouillon' && (
           <>
-            <button
+            <Button
               type="button"
               disabled={statusUpdating || dirty}
               onClick={() => handleStatusChange('envoyé', { date_envoi: new Date().toISOString() })}
-              className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Marquer comme envoyé
-            </button>
+            </Button>
             {dirty && (
               <p className="text-sm text-amber-700">Enregistrez vos modifications avant d'envoyer le devis.</p>
             )}
@@ -251,124 +249,116 @@ export default function DetailDevis() {
         )}
         {devis.statut === 'envoyé' && (
           <>
-            <button
+            <Button
               type="button"
+              variant="success"
               disabled={statusUpdating}
               onClick={() => handleStatusChange('accepté', { date_reponse: new Date().toISOString() })}
-              className="rounded bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Marquer comme accepté
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
               disabled={statusUpdating}
               onClick={() => handleStatusChange('refusé', { date_reponse: new Date().toISOString() })}
-              className="rounded bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Marquer comme refusé
-            </button>
-            <button
-              type="button"
-              disabled={statusUpdating}
-              onClick={() => handleStatusChange('brouillon', {})}
-              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" variant="secondary" disabled={statusUpdating} onClick={() => handleStatusChange('brouillon', {})}>
               Repasser en brouillon
-            </button>
+            </Button>
           </>
         )}
       </div>
 
-      {saveError && <p className="mb-4 rounded bg-red-50 p-4 text-red-700">{saveError}</p>}
+      {saveError && <Alert className="mb-4">{saveError}</Alert>}
 
-      <table className="w-full border-collapse text-left text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-gray-500">
-            <th className="py-2 pr-4">Description</th>
-            <th className="py-2 pr-4">Quantité</th>
-            <th className="py-2 pr-4">Unité</th>
-            <th className="py-2 pr-4">Prix unitaire</th>
-            <th className="py-2 pr-4">Montant</th>
-            {devis.statut === 'brouillon' && <th className="py-2 pr-4"></th>}
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line) =>
-            devis.statut === 'brouillon' ? (
-              <tr key={line.key} className="border-b border-gray-100">
-                <td className="py-2 pr-4">
-                  <input
-                    value={line.description}
-                    onChange={(e) => updateLine(line.key, { description: e.target.value })}
-                    required
-                    className="w-full rounded border border-gray-300 px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    type="number"
-                    step="any"
-                    value={line.quantite}
-                    onChange={(e) => updateLine(line.key, { quantite: e.target.value })}
-                    className="w-24 rounded border border-gray-300 px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    value={line.unite}
-                    onChange={(e) => updateLine(line.key, { unite: e.target.value })}
-                    className="w-20 rounded border border-gray-300 px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4">
-                  <input
-                    type="number"
-                    step="any"
-                    value={line.prix_unitaire}
-                    onChange={(e) => updateLine(line.key, { prix_unitaire: e.target.value })}
-                    className="w-28 rounded border border-gray-300 px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-4 text-gray-700">{currencyFormatter.format(computeMontant(line))}</td>
-                <td className="py-2 pr-4">
-                  <button type="button" onClick={() => removeLine(line.key)} className="text-sm text-red-600 hover:underline">
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              <tr key={line.key} className="border-b border-gray-100">
-                <td className="py-2 pr-4 text-gray-900">{line.description}</td>
-                <td className="py-2 pr-4 text-gray-700">{line.quantite || '—'}</td>
-                <td className="py-2 pr-4 text-gray-700">{line.unite || '—'}</td>
-                <td className="py-2 pr-4 text-gray-700">
-                  {line.prix_unitaire ? currencyFormatter.format(Number(line.prix_unitaire)) : '—'}
-                </td>
-                <td className="py-2 pr-4 text-gray-700">{currencyFormatter.format(computeMontant(line))}</td>
-              </tr>
-            ),
-          )}
-        </tbody>
-      </table>
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr>
+              <th className={TH_CLASS}>Description</th>
+              <th className={TH_CLASS}>Quantité</th>
+              <th className={TH_CLASS}>Unité</th>
+              <th className={TH_CLASS}>Prix unitaire</th>
+              <th className={TH_CLASS}>Montant</th>
+              {devis.statut === 'brouillon' && <th className={TH_CLASS}></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line) =>
+              devis.statut === 'brouillon' ? (
+                <tr key={line.key} className="border-b border-slate-100 last:border-0">
+                  <td className={TD_CLASS}>
+                    <TableInput
+                      value={line.description}
+                      onChange={(e) => updateLine(line.key, { description: e.target.value })}
+                      required
+                      className="w-full"
+                    />
+                  </td>
+                  <td className={TD_CLASS}>
+                    <TableInput
+                      type="number"
+                      step="any"
+                      value={line.quantite}
+                      onChange={(e) => updateLine(line.key, { quantite: e.target.value })}
+                      className="w-24"
+                    />
+                  </td>
+                  <td className={TD_CLASS}>
+                    <TableInput
+                      value={line.unite}
+                      onChange={(e) => updateLine(line.key, { unite: e.target.value })}
+                      className="w-20"
+                    />
+                  </td>
+                  <td className={TD_CLASS}>
+                    <TableInput
+                      type="number"
+                      step="any"
+                      value={line.prix_unitaire}
+                      onChange={(e) => updateLine(line.key, { prix_unitaire: e.target.value })}
+                      className="w-28"
+                    />
+                  </td>
+                  <td className={`${TD_CLASS} font-mono tabular-nums text-slate-700`}>
+                    {currencyFormatter.format(computeMontant(line))}
+                  </td>
+                  <td className={TD_CLASS}>
+                    <button type="button" onClick={() => removeLine(line.key)} className="text-sm text-rose-600 hover:underline">
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={line.key} className="border-b border-slate-100 last:border-0">
+                  <td className={`${TD_CLASS} text-slate-900`}>{line.description}</td>
+                  <td className={`${TD_CLASS} text-slate-700`}>{line.quantite || '—'}</td>
+                  <td className={`${TD_CLASS} text-slate-700`}>{line.unite || '—'}</td>
+                  <td className={`${TD_CLASS} font-mono tabular-nums text-slate-700`}>
+                    {line.prix_unitaire ? currencyFormatter.format(Number(line.prix_unitaire)) : '—'}
+                  </td>
+                  <td className={`${TD_CLASS} font-mono tabular-nums text-slate-700`}>
+                    {currencyFormatter.format(computeMontant(line))}
+                  </td>
+                </tr>
+              ),
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {devis.statut === 'brouillon' && (
         <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={addLine}
-            className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" onClick={addLine}>
             Ajouter une ligne
-          </button>
-          <button
-            type="button"
-            disabled={!dirty || saving || hasEmptyDescription}
-            onClick={handleSaveLines}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
+          </Button>
+          <Button type="button" disabled={!dirty || saving || hasEmptyDescription} onClick={handleSaveLines}>
             {saving ? 'Enregistrement…' : 'Enregistrer les modifications'}
-          </button>
-          {hasEmptyDescription && <p className="text-sm text-red-600">Chaque ligne doit avoir une description.</p>}
+          </Button>
+          {hasEmptyDescription && <p className="text-sm text-rose-600">Chaque ligne doit avoir une description.</p>}
         </div>
       )}
     </div>

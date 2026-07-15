@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase'
+import { Alert, Button, Input, Label } from '../components/ui'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -23,38 +24,35 @@ export default function Login() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg bg-white p-8 shadow">
-        <h1 className="mb-6 text-xl font-semibold text-gray-900">Connexion Thermik</h1>
+    <div className="flex h-screen items-center justify-center bg-slate-900">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-copper-500 font-display text-base font-bold text-white">
+            T
+          </span>
+          <span className="font-display text-xl font-semibold tracking-tight text-white">Thermik</span>
+        </div>
 
-        <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="mb-4 w-full rounded border border-gray-300 px-3 py-2"
-        />
+        <form onSubmit={handleSubmit} className="rounded-lg bg-white p-8 shadow-xl shadow-black/20">
+          <h1 className="mb-6 font-display text-lg font-semibold tracking-tight text-slate-900">Connexion</h1>
 
-        <label className="mb-1 block text-sm font-medium text-gray-700">Mot de passe</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="mb-4 w-full rounded border border-gray-300 px-3 py-2"
-        />
+          <div className="mb-4">
+            <Label>Email</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
 
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          <div className="mb-5">
+            <Label>Mot de passe</Label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-blue-600 py-2 font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? 'Connexion…' : 'Se connecter'}
-        </button>
-      </form>
+          {error && <Alert className="mb-4">{error}</Alert>}
+
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? 'Connexion…' : 'Se connecter'}
+          </Button>
+        </form>
+      </div>
     </div>
   )
 }

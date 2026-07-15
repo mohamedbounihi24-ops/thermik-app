@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import { Alert, Button, Card, Input, Label, PageHeader, TABLE_WRAP, TD_CLASS, TH_CLASS, TR_CLASS } from '../components/ui'
 
 type Client = {
   id: string
@@ -116,90 +117,76 @@ export default function Clients() {
 
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold text-gray-900">Clients</h1>
+      <PageHeader title="Clients" />
 
-      <form onSubmit={handleSubmit} className="mb-8 max-w-lg">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Nom</label>
-        <input
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          required
-          className="mb-3 w-full rounded border border-gray-300 px-3 py-2"
-        />
+      <Card className="mb-8 max-w-lg">
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <Label>Nom</Label>
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+          </div>
 
-        <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
-        <input
-          type="email"
-          value={form.email}
-          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-          className="mb-3 w-full rounded border border-gray-300 px-3 py-2"
-        />
+          <div className="mb-4">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </div>
 
-        <label className="mb-1 block text-sm font-medium text-gray-700">Téléphone</label>
-        <input
-          value={form.phone}
-          onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-          className="mb-3 w-full rounded border border-gray-300 px-3 py-2"
-        />
+          <div className="mb-4">
+            <Label>Téléphone</Label>
+            <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          </div>
 
-        <label className="mb-1 block text-sm font-medium text-gray-700">Adresse</label>
-        <input
-          value={form.address}
-          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-          className="mb-3 w-full rounded border border-gray-300 px-3 py-2"
-        />
+          <div className="mb-5">
+            <Label>Adresse</Label>
+            <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+          </div>
 
-        {saveError && <p className="mb-3 rounded bg-red-50 p-4 text-red-700">{saveError}</p>}
+          {saveError && <Alert className="mb-4">{saveError}</Alert>}
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={!form.name.trim() || saving}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {saving ? 'Enregistrement…' : editingId ? 'Enregistrer les modifications' : 'Créer le client'}
-          </button>
-          {editingId && (
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Annuler
-            </button>
-          )}
-        </div>
-      </form>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={!form.name.trim() || saving}>
+              {saving ? 'Enregistrement…' : editingId ? 'Enregistrer les modifications' : 'Créer le client'}
+            </Button>
+            {editingId && (
+              <Button type="button" variant="secondary" onClick={cancelEdit}>
+                Annuler
+              </Button>
+            )}
+          </div>
+        </form>
+      </Card>
 
       {loading ? (
-        <p className="text-gray-500">Chargement des clients…</p>
+        <p className="text-sm text-slate-500">Chargement des clients…</p>
       ) : loadError ? (
-        <p className="rounded bg-red-50 p-4 text-red-700">{loadError}</p>
+        <Alert>{loadError}</Alert>
       ) : clients.length === 0 ? (
-        <p className="text-gray-500">Aucun client pour le moment.</p>
+        <p className="text-sm text-slate-500">Aucun client pour le moment.</p>
       ) : (
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-500">
-              <th className="py-2 pr-4">Nom</th>
-              <th className="py-2 pr-4">Email</th>
-              <th className="py-2 pr-4">Téléphone</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client) => (
-              <tr
-                key={client.id}
-                onClick={() => startEdit(client)}
-                className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
-              >
-                <td className="py-2 pr-4 font-medium text-gray-900">{client.name}</td>
-                <td className="py-2 pr-4 text-gray-700">{client.email ?? '—'}</td>
-                <td className="py-2 pr-4 text-gray-700">{client.phone ?? '—'}</td>
+        <div className={TABLE_WRAP}>
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr>
+                <th className={TH_CLASS}>Nom</th>
+                <th className={TH_CLASS}>Email</th>
+                <th className={TH_CLASS}>Téléphone</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={client.id} onClick={() => startEdit(client)} className={`cursor-pointer ${TR_CLASS}`}>
+                  <td className={`${TD_CLASS} font-medium text-slate-900`}>{client.name}</td>
+                  <td className={`${TD_CLASS} text-slate-700`}>{client.email ?? '—'}</td>
+                  <td className={`${TD_CLASS} text-slate-700`}>{client.phone ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )
