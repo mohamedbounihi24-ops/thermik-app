@@ -7,6 +7,7 @@ import NouveauDevis from './pages/NouveauDevis'
 import DetailDevis from './pages/DetailDevis'
 import Clients from './pages/Clients'
 import SuiviRelances from './pages/SuiviRelances'
+import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/devis/:id" element={<DetailDevis />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/relances" element={<SuiviRelances />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </AuthProvider>

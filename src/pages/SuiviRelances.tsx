@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { dateFormatter } from '../lib/format'
-import { Alert, PageHeader, StatusBadge, TABLE_WRAP, TD_CLASS, TH_CLASS, TR_CLASS, type StatusTone } from '../components/ui'
+import {
+  Alert,
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+  TABLE_WRAP,
+  TD_CLASS,
+  TH_CLASS,
+  TR_CLASS,
+  type StatusTone,
+} from '../components/ui'
 
 type Relance = {
   id: string
@@ -79,7 +89,10 @@ export default function SuiviRelances() {
     <div>
       <PageHeader title="Suivi relances" />
       {relances.length === 0 ? (
-        <p className="text-sm text-slate-500">Aucune relance envoyée pour le moment.</p>
+        <EmptyState
+          title="Aucune relance envoyée pour le moment"
+          description="Les relances automatiques (J+3, J+7, J+14) apparaîtront ici dès qu'un devis envoyé reste sans réponse."
+        />
       ) : (
         <div className={TABLE_WRAP}>
           <table className="w-full border-collapse text-left">

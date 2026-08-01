@@ -5,3 +5,9 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+
+# Skills tiers installés localement via `npx skills add` — données/outillage
+# de l'environnement de dev, pas du code du projet.
+.agents/
+.claude/skills/
+skills-lock.json

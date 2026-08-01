@@ -12,7 +12,7 @@ export const TD_CLASS = 'px-4 py-3 text-sm'
 export const TR_CLASS = 'border-b border-slate-100 last:border-0 hover:bg-copper-50/40'
 
 const BUTTON_BASE =
-  'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-300 focus-visible:ring-offset-2'
+  'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-300 focus-visible:ring-offset-2'
 
 const BUTTON_VARIANTS = {
   primary: 'bg-copper-600 text-white hover:bg-copper-700',
@@ -83,6 +83,24 @@ export function Alert({
   className?: string
 }) {
   return <p className={`rounded-md border px-4 py-3 text-sm ${ALERT_VARIANTS[variant]} ${className}`}>{children}</p>
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description?: string
+  action?: ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+      <p className="font-medium text-slate-900">{title}</p>
+      {description && <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>}
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
+    </div>
+  )
 }
 
 const STATUS_TONES = {

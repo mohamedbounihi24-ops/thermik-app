@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { pdf } from '@react-pdf/renderer'
 import { supabase } from '../lib/supabase'
 import { STATUT_TONES, currencyFormatter, dateFormatter, type Statut } from '../lib/format'
+import { DevisPdfDocument } from '../lib/DevisPdfDocument'
 import { Alert, Button, StatusBadge, TableInput, TD_CLASS, TH_CLASS } from '../components/ui'
 
 type Devis = {
@@ -12,6 +14,7 @@ type Devis = {
   created_at: string
   date_envoi: string | null
   date_reponse: string | null
+  company_id: string
   clients: { name: string } | null
 }
 
@@ -35,7 +38,8 @@ type EditableLine = {
   prix_unitaire: string
 }
 
-const DEVIS_SELECT = 'id, numero, statut, montant_ht, created_at, date_envoi, date_reponse, clients(name)'
+const DEVIS_SELECT =
+  'id, numero, statut, montant_ht, created_at, date_envoi, date_reponse, company_id, clients(name)'
 const DEVIS_LINE_SELECT = 'id, description, quantite, unite, prix_unitaire'
 
 function computeMontant(line: EditableLine) {
@@ -56,6 +60,9 @@ export default function DetailDevis() {
 
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
+
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   async function loadDevis(devisId: string) {
     const [devisResult, linesResult] = await Promise.all([
@@ -187,6 +194,71 @@ export default function DetailDevis() {
     setStatusUpdating(false)
   }
 
+  // Génère le PDF stylé du devis, le stocke dans Supabase Storage, et
+  // déclenche son téléchargement dans le navigateur.
+  async function handleGeneratePdf() {
+    if (!devis) return
+    setPdfError(null)
+    setGeneratingPdf(true)
+
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('name, siret, email, phone, address, logo_url')
+      .eq('id', devis.company_id)
+      .maybeSingle()
+
+    if (companyError || !company) {
+      setPdfError("Impossible de récupérer les informations de l'entreprise.")
+      setGeneratingPdf(false)
+      return
+    }
+
+    const pdfLines = lines.map((l) => ({
+      description: l.description,
+      quantite: Number(l.quantite) || 0,
+      unite: l.unite || '',
+      prix_unitaire: Number(l.prix_unitaire) || 0,
+      montant_ligne: computeMontant(l),
+    }))
+
+    try {
+      const blob = await pdf(
+        <DevisPdfDocument
+          company={company}
+          client={{ name: devis.clients?.name ?? 'Client' }}
+          devis={{ numero: devis.numero, created_at: devis.created_at }}
+          lines={pdfLines}
+        />,
+      ).toBlob()
+
+      const filePath = `${devis.id}.pdf`
+      const { error: uploadError } = await supabase.storage
+        .from('devis-pdfs')
+        .upload(filePath, blob, { contentType: 'application/pdf', upsert: true })
+
+      if (uploadError) {
+        setPdfError("Échec de l'enregistrement du PDF. Réessayez.")
+        setGeneratingPdf(false)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('devis-pdfs').getPublicUrl(filePath)
+      await supabase.from('devis').update({ pdf_url: publicUrlData.publicUrl }).eq('id', devis.id)
+
+      // Déclenche le téléchargement local dans le navigateur.
+      const downloadUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `${devis.numero}.pdf`
+      link.click()
+      URL.revokeObjectURL(downloadUrl)
+    } catch {
+      setPdfError('Échec de la génération du PDF. Réessayez.')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   if (loading) return <p className="text-sm text-slate-500">Chargement du devis…</p>
   if (loadError) return <Alert>{loadError}</Alert>
   if (!devis) return null
@@ -231,6 +303,7 @@ export default function DetailDevis() {
       </dl>
 
       {statusError && <Alert className="mb-4">{statusError}</Alert>}
+      {pdfError && <Alert className="mb-4">{pdfError}</Alert>}
 
       <div className="mb-6 flex items-center gap-2">
         {devis.statut === 'brouillon' && (
@@ -270,6 +343,15 @@ export default function DetailDevis() {
             </Button>
           </>
         )}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={generatingPdf || dirty || lines.length === 0}
+          onClick={handleGeneratePdf}
+        >
+          {generatingPdf ? 'Génération…' : 'Télécharger le PDF'}
+        </Button>
+        {dirty && <p className="text-sm text-amber-700">Enregistrez vos modifications avant de générer le PDF.</p>}
       </div>
 
       {saveError && <Alert className="mb-4">{saveError}</Alert>}

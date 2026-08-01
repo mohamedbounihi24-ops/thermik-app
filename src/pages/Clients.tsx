@@ -1,7 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { Alert, Button, Card, Input, Label, PageHeader, TABLE_WRAP, TD_CLASS, TH_CLASS, TR_CLASS } from '../components/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  Label,
+  PageHeader,
+  TABLE_WRAP,
+  TD_CLASS,
+  TH_CLASS,
+  TR_CLASS,
+} from '../components/ui'
 
 type Client = {
   id: string
@@ -165,7 +177,10 @@ export default function Clients() {
       ) : loadError ? (
         <Alert>{loadError}</Alert>
       ) : clients.length === 0 ? (
-        <p className="text-sm text-slate-500">Aucun client pour le moment.</p>
+        <EmptyState
+          title="Aucun client pour le moment"
+          description="Ajoutez votre premier client avec le formulaire ci-dessus — il sera ensuite sélectionnable lors de la création d'un devis."
+        />
       ) : (
         <div className={TABLE_WRAP}>
           <table className="w-full border-collapse text-left">
