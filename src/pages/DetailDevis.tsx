@@ -6,6 +6,9 @@ import { STATUT_TONES, currencyFormatter, dateFormatter, type Statut } from '../
 import { DevisPdfDocument } from '../lib/DevisPdfDocument'
 import { Alert, Button, StatusBadge, TableInput, TD_CLASS, TH_CLASS } from '../components/ui'
 
+// URL de production du workflow n8n "devis-email" (Webhook → HTTP Request → Gmail).
+const N8N_SEND_EMAIL_WEBHOOK = 'https://mohamedbounihi24.app.n8n.cloud/webhook/devis-email'
+
 type Devis = {
   id: string
   numero: string
@@ -15,7 +18,9 @@ type Devis = {
   date_envoi: string | null
   date_reponse: string | null
   company_id: string
-  clients: { name: string } | null
+  pdf_url: string | null
+  email_envoye_at: string | null
+  clients: { name: string; email: string | null } | null
 }
 
 type DevisLineRow = {
@@ -39,7 +44,7 @@ type EditableLine = {
 }
 
 const DEVIS_SELECT =
-  'id, numero, statut, montant_ht, created_at, date_envoi, date_reponse, company_id, clients(name)'
+  'id, numero, statut, montant_ht, created_at, date_envoi, date_reponse, company_id, pdf_url, email_envoye_at, clients(name, email)'
 const DEVIS_LINE_SELECT = 'id, description, quantite, unite, prix_unitaire'
 
 function computeMontant(line: EditableLine) {
@@ -63,6 +68,9 @@ export default function DetailDevis() {
 
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   async function loadDevis(devisId: string) {
     const [devisResult, linesResult] = await Promise.all([
@@ -245,6 +253,11 @@ export default function DetailDevis() {
       const { data: publicUrlData } = supabase.storage.from('devis-pdfs').getPublicUrl(filePath)
       await supabase.from('devis').update({ pdf_url: publicUrlData.publicUrl }).eq('id', devis.id)
 
+      // Le state local doit refléter le nouveau pdf_url tout de suite,
+      // sinon le bouton "Envoyer au client" resterait désactivé jusqu'au
+      // prochain rechargement de la page.
+      setDevis((current) => (current ? { ...current, pdf_url: publicUrlData.publicUrl } : current))
+
       // Déclenche le téléchargement local dans le navigateur.
       const downloadUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -256,6 +269,72 @@ export default function DetailDevis() {
       setPdfError('Échec de la génération du PDF. Réessayez.')
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  // Envoie le PDF déjà généré au client par email, via le workflow n8n
+  // (Webhook → télécharge le PDF → Gmail avec pièce jointe). Une fois
+  // envoyé, on enregistre la date en base pour empêcher un renvoi
+  // accidentel, ET on fait automatiquement passer le devis en "envoyé"
+  // s'il était encore en brouillon — plus besoin de cliquer sur les deux
+  // boutons séparément, l'un implique l'autre.
+  async function handleSendEmail() {
+    if (!devis || !devis.pdf_url || devis.email_envoye_at) return
+    setSendError(null)
+
+    const clientEmail = devis.clients?.email
+    if (!clientEmail) {
+      setSendError("Ce client n'a pas d'adresse email enregistrée. Ajoutez-en une dans sa fiche client.")
+      return
+    }
+
+    setSendingEmail(true)
+
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', devis.company_id)
+      .maybeSingle()
+
+    try {
+      const response = await fetch(N8N_SEND_EMAIL_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdf_url: devis.pdf_url,
+          client_email: clientEmail,
+          devis_numero: devis.numero,
+          company_name: company?.name ?? '',
+        }),
+      })
+
+      if (!response.ok) throw new Error('Réponse non OK')
+
+      const sentAt = new Date().toISOString()
+      const shouldAutoTransition = devis.statut === 'brouillon'
+
+      const { data: updated, error: updateError } = await supabase
+        .from('devis')
+        .update({
+          email_envoye_at: sentAt,
+          ...(shouldAutoTransition ? { statut: 'envoyé' as Statut, date_envoi: sentAt } : {}),
+        })
+        .eq('id', devis.id)
+        .select(DEVIS_SELECT)
+        .single()
+
+      if (updateError || !updated) {
+        // L'email est bien parti, seule la mise à jour du statut a échoué —
+        // on met quand même à jour email_envoye_at localement pour éviter
+        // un double-envoi, et on informe sans faire échouer toute l'action.
+        setDevis((current) => (current ? { ...current, email_envoye_at: sentAt } : current))
+      } else {
+        setDevis(updated as unknown as Devis)
+      }
+    } catch {
+      setSendError("Échec de l'envoi de l'email. Réessayez.")
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -304,8 +383,14 @@ export default function DetailDevis() {
 
       {statusError && <Alert className="mb-4">{statusError}</Alert>}
       {pdfError && <Alert className="mb-4">{pdfError}</Alert>}
+      {sendError && <Alert className="mb-4">{sendError}</Alert>}
+      {devis.email_envoye_at && (
+        <Alert variant="info" className="mb-4 border-emerald-200 bg-emerald-50 text-emerald-700">
+          Devis envoyé par email à {devis.clients?.email} le {dateFormatter.format(new Date(devis.email_envoye_at))}.
+        </Alert>
+      )}
 
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {devis.statut === 'brouillon' && (
           <>
             <Button
@@ -351,7 +436,22 @@ export default function DetailDevis() {
         >
           {generatingPdf ? 'Génération…' : 'Télécharger le PDF'}
         </Button>
-        {dirty && <p className="text-sm text-amber-700">Enregistrez vos modifications avant de générer le PDF.</p>}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={sendingEmail || !devis.pdf_url || dirty || Boolean(devis.email_envoye_at)}
+          onClick={handleSendEmail}
+        >
+          {sendingEmail
+            ? 'Envoi…'
+            : devis.email_envoye_at
+              ? `Envoyé le ${dateFormatter.format(new Date(devis.email_envoye_at))}`
+              : 'Envoyer au client'}
+        </Button>
+        {dirty && <p className="text-sm text-amber-700">Enregistrez vos modifications avant de générer/envoyer le PDF.</p>}
+        {!dirty && !devis.pdf_url && (
+          <p className="text-sm text-slate-500">Générez d'abord le PDF pour pouvoir l'envoyer.</p>
+        )}
       </div>
 
       {saveError && <Alert className="mb-4">{saveError}</Alert>}

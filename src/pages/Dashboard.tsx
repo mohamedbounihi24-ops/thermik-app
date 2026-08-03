@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts'
-import { Clock, CheckCircle2, TrendingUp, FileEdit, ArrowUpRight, ArrowDownRight, Mic, Keyboard, AlertTriangle } from 'lucide-react'
+import { Clock, CheckCircle2, TrendingUp, FileEdit, ArrowUpRight, ArrowDownRight, Mic, Keyboard, AlertTriangle, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { STATUT_TONES, currencyFormatter, dateFormatter, statCurrencyFormatter, type Statut } from '../lib/format'
 import {
@@ -10,6 +10,7 @@ import {
   EmptyState,
   PageHeader,
   StatusBadge,
+  TABLE_WRAP,
   TD_CLASS,
   TH_CLASS,
   TR_CLASS,
@@ -40,11 +41,17 @@ const PIE_COLORS: Record<string, string> = {
   'expiré': '#EA580C',
 }
 
+type KpiKey = 'attente' | 'signes' | 'taux' | 'brouillons'
+
 // Compare une période de 30j à la précédente. Retourne un pourcentage réel
 // (pas inventé) ou null si on n'a pas assez de recul pour comparer.
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return null
   return Math.round(((current - previous) / previous) * 100)
+}
+
+function daysSince(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / ONE_DAY_MS)
 }
 
 function TrendBadge({ pct, goodDirection = 'up' }: { pct: number | null; goodDirection?: 'up' | 'down' }) {
@@ -72,6 +79,7 @@ function StatCell({
   iconColor = '#C1613A',
   trendPct = null,
   goodDirection = 'up',
+  onClick,
 }: {
   label: string
   value: string
@@ -80,9 +88,14 @@ function StatCell({
   iconColor?: string
   trendPct?: number | null
   goodDirection?: 'up' | 'down'
+  onClick?: () => void
 }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-slate-100 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-300"
+    >
       <div className="flex items-center justify-between">
         <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
         <div
@@ -97,22 +110,99 @@ function StatCell({
         <TrendBadge pct={trendPct} goodDirection={goodDirection} />
       </div>
       {sub && <dd className="mt-1 text-xs text-slate-500">{sub}</dd>}
+    </button>
+  )
+}
+
+// --- Modal de détail KPI ---
+function KpiModal({
+  title,
+  subtitle,
+  onClose,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  // Ferme avec la touche Échap.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-5 flex items-start justify-between">
+          <div>
+            <h2 className="font-display text-xl font-bold tracking-tight text-slate-900">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   )
 }
 
-// Badge affiché uniquement pour les devis "envoyé" qui traînent depuis
-// plus de STALE_THRESHOLD_DAYS jours sans réponse — évite les opportunités
-// oubliées, c'est la fonctionnalité "ROI" qu'on vient d'ajouter.
-function StaleBadge({ devis }: { devis: DevisRow }) {
-  if (devis.statut !== 'envoyé') return null
-  const daysSince = Math.floor((Date.now() - new Date(devis.created_at).getTime()) / ONE_DAY_MS)
-  if (daysSince < STALE_THRESHOLD_DAYS) return null
+// Petite table de devis réutilisée dans les modals.
+function MiniDevisTable({
+  devis,
+  extraCol,
+}: {
+  devis: DevisRow[]
+  extraCol?: { header: string; render: (d: DevisRow) => React.ReactNode }
+}) {
+  if (devis.length === 0) {
+    return <p className="py-6 text-center text-sm text-slate-400">Aucun devis dans cette catégorie.</p>
+  }
   return (
-    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-      <AlertTriangle size={11} />
-      {daysSince}j sans réponse
-    </span>
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <table className="w-full border-collapse text-left">
+        <thead>
+          <tr>
+            <th className={TH_CLASS}>Numéro</th>
+            <th className={TH_CLASS}>Client</th>
+            <th className={`${TH_CLASS} text-right`}>Montant HT</th>
+            {extraCol && <th className={`${TH_CLASS} text-right`}>{extraCol.header}</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {devis.map((d) => (
+            <tr key={d.id} className="border-b border-slate-100 last:border-0">
+              <td className={`${TD_CLASS} font-medium`}>
+                <Link to={`/devis/${d.id}`} className="text-copper-600 hover:underline">
+                  {d.numero}
+                </Link>
+              </td>
+              <td className={`${TD_CLASS} text-slate-700`}>{d.clients?.name ?? '—'}</td>
+              <td className={`${TD_CLASS} text-right font-mono tabular-nums text-slate-700`}>
+                {d.montant_ht != null ? currencyFormatter.format(d.montant_ht) : '—'}
+              </td>
+              {extraCol && <td className={`${TD_CLASS} text-right text-slate-500`}>{extraCol.render(d)}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -121,6 +211,7 @@ export default function Dashboard() {
   const [devisList, setDevisList] = useState<DevisRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [openKpi, setOpenKpi] = useState<KpiKey | null>(null)
 
   // Fetch réel au montage — c'est le fix du bug v1 : jamais de state qui vit
   // sans avoir été relu depuis Supabase.
@@ -182,14 +273,26 @@ export default function Dashboard() {
     }
   }, [])
 
-  const stats = useMemo(() => {
+  // Sous-listes utilisées par les stats ET les modals de détail.
+  const groups = useMemo(() => {
     const now = Date.now()
-    const enAttente = devisList.filter((d) => d.statut === 'envoyé')
+    const enAttente = devisList
+      .filter((d) => d.statut === 'envoyé')
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     const acceptes = devisList.filter((d) => d.statut === 'accepté')
     const signes30j = acceptes.filter(
       (d) => d.date_reponse && now - new Date(d.date_reponse).getTime() <= THIRTY_DAYS_MS,
     )
-    const tranches = acceptes.length + devisList.filter((d) => d.statut === 'refusé' || d.statut === 'expiré').length
+    const refuses = devisList.filter((d) => d.statut === 'refusé')
+    const expires = devisList.filter((d) => d.statut === 'expiré')
+    const brouillons = devisList.filter((d) => d.statut === 'brouillon')
+    return { enAttente, acceptes, signes30j, refuses, expires, brouillons }
+  }, [devisList])
+
+  const stats = useMemo(() => {
+    const now = Date.now()
+    const { enAttente, acceptes, signes30j, refuses, expires, brouillons } = groups
+    const tranches = acceptes.length + refuses.length + expires.length
 
     // --- Comparaison période courante (0-30j) vs précédente (30-60j) ---
     // Basé sur les vraies dates des devis, pour des pourcentages réels.
@@ -222,11 +325,7 @@ export default function Dashboard() {
     const acceptesPrev = tranchesPrev.filter((d) => d.statut === 'accepté')
     const tauxPrev = tranchesPrev.length > 0 ? (acceptesPrev.length / tranchesPrev.length) * 100 : null
 
-    const aRelancer = devisList.filter((d) => {
-      if (d.statut !== 'envoyé') return false
-      const days = Math.floor((now - new Date(d.created_at).getTime()) / ONE_DAY_MS)
-      return days >= STALE_THRESHOLD_DAYS
-    })
+    const aRelancer = enAttente.filter((d) => daysSince(d.created_at) >= STALE_THRESHOLD_DAYS)
 
     return {
       enAttenteMontant: enAttente.reduce((sum, d) => sum + (d.montant_ht ?? 0), 0),
@@ -240,12 +339,12 @@ export default function Dashboard() {
         tauxPrev !== null && tranches > 0
           ? pctChange(Math.round((acceptes.length / tranches) * 100), Math.round(tauxPrev))
           : null,
-      brouillons: devisList.filter((d) => d.statut === 'brouillon').length,
+      brouillons: brouillons.length,
       brouillonsTrend: pctChange(brouillonsCountCurrent, brouillonsCountPrev),
       aRelancerCount: aRelancer.length,
       aRelancerMontant: aRelancer.reduce((sum, d) => sum + (d.montant_ht ?? 0), 0),
     }
-  }, [devisList])
+  }, [devisList, groups])
 
   const trendData = useMemo(() => {
     const monthly: Record<string, { ca: number; sortKey: string }> = {}
@@ -324,7 +423,7 @@ export default function Dashboard() {
   return (
     <div>
       <PageHeader
-        title="Devis"
+        title="Tableau de bord"
         action={<Button onClick={() => navigate('/devis/nouveau')}>Nouveau devis</Button>}
       />
 
@@ -353,6 +452,7 @@ export default function Dashboard() {
           iconColor="#C1613A"
           trendPct={stats.enAttenteTrend}
           goodDirection="up"
+          onClick={() => setOpenKpi('attente')}
         />
         <StatCell
           label="Signés · 30 jours"
@@ -362,6 +462,7 @@ export default function Dashboard() {
           iconColor="#16A34A"
           trendPct={stats.signesTrend}
           goodDirection="up"
+          onClick={() => setOpenKpi('signes')}
         />
         <StatCell
           label="Taux d'acceptation"
@@ -371,6 +472,7 @@ export default function Dashboard() {
           iconColor="#2563EB"
           trendPct={stats.tauxTrend}
           goodDirection="up"
+          onClick={() => setOpenKpi('taux')}
         />
         <StatCell
           label="Brouillons"
@@ -380,8 +482,108 @@ export default function Dashboard() {
           iconColor="#78716C"
           trendPct={stats.brouillonsTrend}
           goodDirection="down"
+          onClick={() => setOpenKpi('brouillons')}
         />
       </div>
+
+      {/* --- Modals de détail KPI --- */}
+      {openKpi === 'attente' && (
+        <KpiModal
+          title="Devis en attente de réponse"
+          subtitle={`${stats.enAttenteCount} devis envoyés — ${currencyFormatter.format(stats.enAttenteMontant)} au total`}
+          onClose={() => setOpenKpi(null)}
+        >
+          <MiniDevisTable
+            devis={groups.enAttente}
+            extraCol={{
+              header: 'Attente',
+              render: (d) => {
+                const days = daysSince(d.created_at)
+                return (
+                  <span className={days >= STALE_THRESHOLD_DAYS ? 'font-semibold text-amber-700' : ''}>
+                    {days} j
+                  </span>
+                )
+              },
+            }}
+          />
+          <p className="mt-4 text-xs text-slate-500">
+            Les devis en attente depuis plus de {STALE_THRESHOLD_DAYS} jours sont signalés en orange — pensez à les
+            relancer.
+          </p>
+        </KpiModal>
+      )}
+
+      {openKpi === 'signes' && (
+        <KpiModal
+          title="Devis signés sur 30 jours"
+          subtitle={`${stats.signes30jCount} devis acceptés — ${currencyFormatter.format(stats.signes30jMontant)} de CA`}
+          onClose={() => setOpenKpi(null)}
+        >
+          <MiniDevisTable
+            devis={groups.signes30j}
+            extraCol={{
+              header: 'Signé le',
+              render: (d) => (d.date_reponse ? dateFormatter.format(new Date(d.date_reponse)) : '—'),
+            }}
+          />
+        </KpiModal>
+      )}
+
+      {openKpi === 'taux' && (
+        <KpiModal
+          title="Taux d'acceptation"
+          subtitle="Calculé sur l'ensemble des devis tranchés (acceptés, refusés ou expirés)"
+          onClose={() => setOpenKpi(null)}
+        >
+          <div className="mb-5 grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-emerald-50 p-4 text-center">
+              <p className="font-mono text-2xl font-semibold text-emerald-700">{groups.acceptes.length}</p>
+              <p className="mt-0.5 text-xs font-medium text-emerald-700">Acceptés</p>
+            </div>
+            <div className="rounded-xl bg-rose-50 p-4 text-center">
+              <p className="font-mono text-2xl font-semibold text-rose-700">{groups.refuses.length}</p>
+              <p className="mt-0.5 text-xs font-medium text-rose-700">Refusés</p>
+            </div>
+            <div className="rounded-xl bg-orange-50 p-4 text-center">
+              <p className="font-mono text-2xl font-semibold text-orange-700">{groups.expires.length}</p>
+              <p className="mt-0.5 text-xs font-medium text-orange-700">Expirés</p>
+            </div>
+          </div>
+          <p className="mb-5 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {groups.acceptes.length} accepté{groups.acceptes.length > 1 ? 's' : ''} ÷{' '}
+            {groups.acceptes.length + groups.refuses.length + groups.expires.length} tranchés ={' '}
+            <span className="font-semibold text-slate-900">{stats.tauxAcceptation ?? '—'} %</span>
+          </p>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Devis refusés ou expirés</h3>
+          <MiniDevisTable
+            devis={[...groups.refuses, ...groups.expires]}
+            extraCol={{
+              header: 'Statut',
+              render: (d) => <StatusBadge tone={STATUT_TONES[d.statut]} label={d.statut} />,
+            }}
+          />
+        </KpiModal>
+      )}
+
+      {openKpi === 'brouillons' && (
+        <KpiModal
+          title="Brouillons à finaliser"
+          subtitle={`${stats.brouillons} devis en cours de rédaction`}
+          onClose={() => setOpenKpi(null)}
+        >
+          <MiniDevisTable
+            devis={groups.brouillons}
+            extraCol={{
+              header: 'Créé le',
+              render: (d) => dateFormatter.format(new Date(d.created_at)),
+            }}
+          />
+          <p className="mt-4 text-xs text-slate-500">
+            Cliquez sur un numéro pour ouvrir le devis, compléter ses lignes et l'envoyer.
+          </p>
+        </KpiModal>
+      )}
 
       <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
@@ -490,7 +692,7 @@ export default function Dashboard() {
           action={<Button onClick={() => navigate('/devis/nouveau')}>Créer un devis</Button>}
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+        <div className={TABLE_WRAP}>
           <table className="w-full border-collapse text-left">
             <thead>
               <tr>
@@ -505,34 +707,42 @@ export default function Dashboard() {
               {/* Un <a> ne peut pas envelopper des <td> (HTML invalide, React
                   le rejette) : lien réel sur le numéro pour le clavier et la
                   molette, clic sur le reste de la ligne en bonus. */}
-              {devisList.map((devis) => (
-                <tr
-                  key={devis.id}
-                  onClick={() => navigate(`/devis/${devis.id}`)}
-                  className={`cursor-pointer ${TR_CLASS}`}
-                >
-                  <td className={`${TD_CLASS} font-medium`}>
-                    <Link
-                      to={`/devis/${devis.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-slate-900 hover:text-copper-600"
-                    >
-                      {devis.numero}
-                    </Link>
-                  </td>
-                  <td className={`${TD_CLASS} text-slate-700`}>{devis.clients?.name ?? '—'}</td>
-                  <td className={TD_CLASS}>
-                    <div className="flex items-center">
-                      <StatusBadge tone={STATUT_TONES[devis.statut]} label={devis.statut} />
-                      <StaleBadge devis={devis} />
-                    </div>
-                  </td>
-                  <td className={`${TD_CLASS} text-right font-mono tabular-nums text-slate-700`}>
-                    {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
-                  </td>
-                  <td className={`${TD_CLASS} text-slate-500`}>{dateFormatter.format(new Date(devis.created_at))}</td>
-                </tr>
-              ))}
+              {devisList.map((devis) => {
+                const stale = devis.statut === 'envoyé' && daysSince(devis.created_at) >= STALE_THRESHOLD_DAYS
+                return (
+                  <tr
+                    key={devis.id}
+                    onClick={() => navigate(`/devis/${devis.id}`)}
+                    className={`cursor-pointer ${TR_CLASS}`}
+                  >
+                    <td className={`${TD_CLASS} font-medium`}>
+                      <Link
+                        to={`/devis/${devis.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-slate-900 hover:text-copper-600"
+                      >
+                        {devis.numero}
+                      </Link>
+                    </td>
+                    <td className={`${TD_CLASS} text-slate-700`}>{devis.clients?.name ?? '—'}</td>
+                    <td className={TD_CLASS}>
+                      <div className="flex items-center gap-2">
+                        <StatusBadge tone={STATUT_TONES[devis.statut]} label={devis.statut} />
+                        {stale && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                            <AlertTriangle size={11} />
+                            {daysSince(devis.created_at)}j sans réponse
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={`${TD_CLASS} text-right font-mono tabular-nums text-slate-700`}>
+                      {devis.montant_ht != null ? currencyFormatter.format(devis.montant_ht) : '—'}
+                    </td>
+                    <td className={`${TD_CLASS} text-slate-500`}>{dateFormatter.format(new Date(devis.created_at))}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
